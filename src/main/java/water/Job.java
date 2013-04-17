@@ -42,15 +42,11 @@ public class Job extends Iced {
     return list != null ? list._jobs : new Job[0];
   }
 
-  public Job(String description, Key dest) {
-    // Pinned to self, because it should be almost always updated locally
-    _self = Key.make(UUID.randomUUID().toString(), (byte) 0, Key.JOB, H2O.SELF);
-    _description = description;
-    _startTime = System.currentTimeMillis();
-    _dest = dest;
+  public Job(String desc, Key dest) {
+    this(desc,dest,null);
   }
   public Job(String desc, Key dest, Key jobKey){
-    _self = jobKey;
+    _self = jobKey != null?jobKey:Key.make(UUID.randomUUID().toString(), (byte) 0, Key.JOB, H2O.SELF);
     _description = desc;
     _startTime = System.currentTimeMillis();
     _dest = dest;
