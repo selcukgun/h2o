@@ -461,18 +461,21 @@ NEXT_CHAR:
   public static class Setup {
     public final byte _separator;
     public final boolean _header;
+    public final CustomParser.Type _pType;
     // Row zero is column names.
     // Remaining rows are parsed from the given data, until we run out
     // of data or hit some arbitrary display limit.
     public final String[][] _data;
     public final int _numlines;        // Number of lines parsed
     public final byte[] _bits;  // The original bits
+
     public Setup(byte separator, boolean header, String[][] data, int numlines, byte[] bits) {
       _separator = separator;
       _header = header;
       _data = data;
       _numlines = numlines;
       _bits = bits;
+      _pType = CustomParser.Type.CSV;
     }
     @Override public boolean equals( Object o ) {
       if( o == null || !(o instanceof Setup) ) return false;

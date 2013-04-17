@@ -197,6 +197,18 @@ public class Job extends Iced {
       super(desc,dest);
       _progress = Key.make(Key.make()._kb,(byte)0,Key.DFJ_INTERNAL_USER,dest.home_node());
       UKV.put(_progress,new ChunkProgress(chunksTotal));
+
+    public ChunkProgressJob(String desc, Key dest, long chunksTotal) {
+      this(desc,dest,chunksTotal,null);
+    }
+    public ChunkProgressJob(String desc, Key dest, long chunksTotal, Key jobKey) {
+      this(desc, dest, chunksTotal, jobKey, Key.make(Key.make()._kb, (byte) 0,Key.DFJ_INTERNAL_USER, dest.home_node()));
+    }
+
+    public ChunkProgressJob(String desc, Key dest, long chunksTotal, Key jobKey, Key progresKey) {
+      super(desc, dest,jobKey);
+      _progress = progresKey;
+      UKV.put(_progress, new ChunkProgress(chunksTotal));
     }
 
     public void updateProgress(final int c){ // c == number of processed chunks

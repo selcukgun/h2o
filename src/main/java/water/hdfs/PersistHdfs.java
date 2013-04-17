@@ -110,6 +110,12 @@ public abstract class PersistHdfs {
     return str;
   }
 
+  public static InputStream openStream(Key k) throws IOException{
+    Path p = getPathForKey(k);
+    FileSystem fs = FileSystem.get(p.toUri(), CONF);
+    return fs.open(p);
+  }
+
   // Actually we typically want a Path not a String
   public static Path getPathForKey(Key k) {  return new Path(getPathStringForKey(k)); }
 

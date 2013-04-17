@@ -1,7 +1,6 @@
 package water.store.s3;
 
-import java.io.EOFException;
-import java.io.IOException;
+import java.io.*;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Properties;
@@ -195,6 +194,11 @@ public abstract class PersistS3 {
     return new String[] { bucket, key };
   }
 
+  public static InputStream openStream(Key k) throws IOException {
+    String[] bk = decodeKey(k);
+    GetObjectRequest r = new GetObjectRequest(bk[0], bk[1]);
+    return getClient().getObject(r).getObjectContent();
+  }
   // Gets the S3 object associated with the key that can read length bytes from offset
   private static S3Object getObjectForKey(Key k, long offset, long length) throws IOException {
     String[] bk = decodeKey(k);

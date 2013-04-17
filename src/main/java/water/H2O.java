@@ -1026,7 +1026,12 @@ public final class H2O {
       // here and will be only computed into one-at-a-time.
       synchronized Histo histo( boolean force ) {
         Histo h = H.get(); // Grab current best histogram
-        if( !force && System.currentTimeMillis() < h._when+100 )
+        if(h == null){
+          compute(0);
+          H.compareAndSet(null,this);
+          return H.get();
+        }
+        if(!force && System.currentTimeMillis() < h._when+100 )
           return h; // It is recent; use it
         if( h._clean && _dirty==Long.MAX_VALUE )
           return h; // No change to the K/V store, so no point

@@ -106,6 +106,10 @@ public class TestUtil {
   public static Key loadAndParseKey(String keyName, String path) {
     Key fkey = load_test_file(path);
     Key okey = Key.make(keyName);
+    if(DKV.get(okey) != null){
+      DKV.remove(okey);
+      DKV.write_barrier();
+    }
     ParseDataset.parse(okey, new Key[]{fkey});
     UKV.remove(fkey);
     return okey;

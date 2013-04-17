@@ -14,6 +14,7 @@ import water.*;
 import water.ValueArray.Column;
 import water.api.GLMProgressPage.GLMBuilder;
 import water.parser.CsvParser;
+import water.parser.ParseDataset.Compression;
 import water.util.Utils;
 
 import com.google.gson.*;
@@ -105,8 +106,9 @@ public class Inspect extends Request {
     int off = 0;
     // First decrypt compression
     InputStream is = null;
+    Compression comp;
     try {
-      switch( water.parser.ParseDataset.guessCompressionMethod(v) ) {
+      switch((comp = water.parser.ParseDataset.guessCompressionMethod(v))) {
       case NONE: // No compression
         off = bs.length; // All bytes ready already
         break;

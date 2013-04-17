@@ -2,6 +2,9 @@ package water;
 
 import java.io.*;
 
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
 // Persistence backend for the local file system.
 // Just for loading or storing files.
 //
@@ -26,6 +29,11 @@ public abstract class PersistNFS {
     final int len = KEY_PREFIX_LENGTH+1; // Strip key prefix & leading slash
     String s = new String(k._kb,len,k._kb.length-len);
     return new File(s);
+  }
+
+  static InputStream openStream(Key k) throws IOException {
+    assert ( k._kb[0] != Key.ARRAYLET_CHUNK ):"open stream should only be used on a value/value array head";
+    return new FileInputStream(getFileForKey(k));
   }
 
   // Read up to 'len' bytes of Value. Value should already be persisted to

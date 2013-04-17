@@ -281,7 +281,14 @@ public class Value extends Iced implements ForkJoinPool.ManagedBlocker {
   }
   /** Creates a Stream for reading bytes */
   public InputStream openStream(ProgressMonitor p) throws IOException {
-    if( isArray() ) return ((ValueArray)get()).openStream(p);
+    if(onNFS())
+      return PersistNFS.openStream(_key);
+    else if(onHDFS())
+      return PersistHdfs.openStream(_key);
+    else if(onS3())
+      return PersistS3.openStream(_key);
+    if(isArray())
+      return ((ValueArray)get()).openStream(p);
     assert _type==TypeMap.PRIM_B;
     return new ByteArrayInputStream(memOrLoad());
   }
