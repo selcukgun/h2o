@@ -49,6 +49,12 @@ public class Job extends Iced {
     _startTime = System.currentTimeMillis();
     _dest = dest;
   }
+  public Job(String desc, Key dest, Key jobKey){
+    _self = jobKey;
+    _description = desc;
+    _startTime = System.currentTimeMillis();
+    _dest = dest;
+  }
 
   public void start() {
     DKV.put(_self, new Value(_self, new byte[0]));
@@ -193,10 +199,6 @@ public class Job extends Iced {
 
   public static class ChunkProgressJob extends Job {
     Key _progress;
-    public ChunkProgressJob(String desc, Key dest, long chunksTotal){
-      super(desc,dest);
-      _progress = Key.make(Key.make()._kb,(byte)0,Key.DFJ_INTERNAL_USER,dest.home_node());
-      UKV.put(_progress,new ChunkProgress(chunksTotal));
 
     public ChunkProgressJob(String desc, Key dest, long chunksTotal) {
       this(desc,dest,chunksTotal,null);
