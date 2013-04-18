@@ -226,7 +226,7 @@ public abstract class PersistS3 {
       if(attempt == _retries) Throwables.propagate(e);
       try{close();}catch(IOException ex){}
       _is = null;
-      try {Thread.sleep(256 << attempt);}catch(InterruptedException ex){}
+      if(attempt > 0) try {Thread.sleep(256 << attempt);}catch(InterruptedException ex){}
       open();
       return;
     }
