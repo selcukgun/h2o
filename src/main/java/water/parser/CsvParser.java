@@ -58,6 +58,7 @@ public class CsvParser extends CustomParser {
 
   @SuppressWarnings("fallthrough")
   @Override public final void parse(Key key) {
+    assert _aryKey == null || DKV.get(_aryKey) != null:"missing ValueArray " + _aryKey;
     ValueArray ary = _aryKey == null ? null : (ValueArray)DKV.get(_aryKey).get();
     ValueString _str = new ValueString();
     byte[] bits = DKV.get(key).memOrLoad();

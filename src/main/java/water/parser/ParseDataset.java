@@ -228,8 +228,7 @@ public final class ParseDataset extends Job {
               throw H2O.unimpl();
             }
             _fileInfo[_idx]._okey = Key.make(new String(key._kb) + "_UNZIPPED");
-            ValueArray.readPut(_fileInfo[_idx]._okey, is);
-            DKV.write_barrier(); // we have to wait until all the values are available at their target nodes before proceeding with parse!!
+            ValueArray.readPut(_fileInfo[_idx]._okey, is,_job);
             v = DKV.get(_fileInfo[_idx]._okey);
             assert v != null;
           } catch (Throwable t) {
