@@ -50,8 +50,15 @@ public class ImportS3 extends Request {
     JsonArray succ = new JsonArray();
     JsonArray fail = new JsonArray();
     String bucket = _bucket.value();
+    String prefix = "";
+    int split = bucket.indexOf('/');
+    if(split > 0){
+      prefix = bucket.substring(split+1);
+      bucket = bucket.substring(0,split);
+    }
     AmazonS3 s3 = PersistS3.getClient();
-    for( S3ObjectSummary obj : s3.listObjects(bucket).getObjectSummaries() ) {
+
+    for( S3ObjectSummary obj : s3.listObjects(bucket,prefix).getObjectSummaries() ) {
       try {
         Key k = PersistS3.loadKey(obj);
         JsonObject o = new JsonObject();

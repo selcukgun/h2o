@@ -251,7 +251,7 @@ public abstract class PersistS3 {
       while(true){
         try{
           int res = _is.read();
-          if(res > 0)_off += 1;
+          if(res != -1)_off += 1;
           return res;
         }catch (IOException e){
           try2Recover(attempts++,e);
