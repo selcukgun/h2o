@@ -21,6 +21,11 @@ public class JStackCollectorTask extends DRemoteTask {
   }
 
   @Override
+  public byte priority(){
+    return H2O.MIN_HI_PRIORITY;
+  }
+
+  @Override
   public void compute2() {
     result = new String[H2O.CLOUD._memary.length];
     Map<Thread, StackTraceElement[]> allStackTraces = Thread.getAllStackTraces();
