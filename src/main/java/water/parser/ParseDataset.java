@@ -273,9 +273,8 @@ public final class ParseDataset extends Job {
       _fileInfo = new FileInfo[_keys.length];
       subTasks = new UnzipAndParseLocalTask[_keys.length];
       setPendingCount(subTasks.length);
-      for(int i = 0; i < _keys.length; ++i){
+      for(int i = 0; i < _keys.length; ++i)
         H2O.submitTask((subTasks[i] = new UnzipAndParseLocalTask(i)));
-      }
       tryComplete();
     }
 

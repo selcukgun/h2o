@@ -209,6 +209,7 @@ public abstract class PersistS3 {
     private void open(){
       assert _is == null;
       GetObjectRequest r = new GetObjectRequest(_bk[0], _bk[1]);
+      System.out.println("opening stream " + Arrays.toString(_bk) + "(" + _off + "," + _to + ")");
       r.setRange(_off, _to);
       _is = getClient().getObject(r).getObjectContent();
     }
@@ -218,12 +219,13 @@ public abstract class PersistS3 {
     public H2OS3InputStream(Key k, long from, long to){
       _k = k;
       _off = from;
-      _to = Math.min(DKV.get(k).length(),to);
+      _to = Math.min(DKV.get(k).length()-1,to);
       _bk = decodeKey(k);
       open();
     }
 
     private void try2Recover(int attempt, IOException e) {
+      System.out.println("[H2OS3InputStream] Attempt("+attempt + ") to recover from " + e.getMessage() + ")");
       if(attempt == _retries) Throwables.propagate(e);
       try{close();}catch(IOException ex){}
       _is = null;
@@ -250,7 +252,7 @@ public abstract class PersistS3 {
       while(true){
         try{
           int res = _is.read();
-          if(res > 0)_off += res;
+          if(res > 0)_off += 1;
           return res;
         }catch (IOException e){
           try2Recover(attempts++,e);
@@ -289,6 +291,7 @@ public abstract class PersistS3 {
       if(_is != null){
         _is.close();
         _is = null;
+        _off = 0;
       }
     }
 
@@ -297,7 +300,9 @@ public abstract class PersistS3 {
       int attempts = 0;
       while(true){
         try{
-          return _is.skip(n);
+          long res = _is.skip(n);
+          if(res > 0)_off += res;
+          return res;
         } catch (IOException e) {
           try2Recover(attempts++,e);
         }
