@@ -293,7 +293,7 @@ public class DParseTask extends MRTask {
    *
    * @throws Exception
    */
-  public void passOne(CsvParser.Setup setup) throws Exception {
+  public DFuture passOne(CsvParser.Setup setup) {
     switch (_parserType) {
     case CSV:
         // precompute the parser setup, column setup and other settings
@@ -303,7 +303,7 @@ public class DParseTask extends MRTask {
         }
         if (setup._data == null) {
           _error= "Unable to determine the separator or number of columns on the dataset";
-          return;
+          return null;
         }
         _colNames = setup._data[0];
         setColumnNames(_colNames);
@@ -317,23 +317,23 @@ public class DParseTask extends MRTask {
         } else
           _nrows = new long[2];
         // launch the distributed parser on its chunks.
-        this.invoke(_sourceDataset._key);
-        break;
+        return fork(_sourceDataset._key);
       case XLS:
+//        throw H2O.unimpl();
         // XLS parsing is not distributed, just obtain the value stream and
         // run the parser
-        CustomParser p = new XlsParser(this);
-        p.parse(_sourceDataset._key);
-        --_numRows; // do not count the header
-        break;
+//        CustomParser p = new XlsParser(this);
+//        p.parse(_sourceDataset._key);
+//        --_numRows; // do not count the header
+//        break;
       case XLSX:
         // XLS parsing is not distributed, just obtain the value stream and
         // run the parser
-        CustomParser px = new XlsxParser(this);
-        px.parse(_sourceDataset._key);
-        break;
+//        CustomParser px = new XlsxParser(this);
+//        px.parse(_sourceDataset._key);
+//        break;
       default:
-        throw new Error("NOT IMPLEMENTED");
+        throw H2O.unimpl();
     }
   }
 

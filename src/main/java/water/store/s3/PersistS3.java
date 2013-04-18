@@ -6,12 +6,14 @@ import java.util.Arrays;
 import java.util.Properties;
 
 import water.*;
+import water.Job.ProgressMonitor;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.Protocol;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
+import com.google.common.base.Throwables;
 import com.google.common.io.ByteStreams;
 
 /** Persistence backend for S3 */
@@ -52,6 +54,7 @@ public abstract class PersistS3 {
       int sz = (int) Math.min(ValueArray.CHUNK_SZ, size);
       byte[] mem = MemoryManager.malloc1(sz); // May stall a long time to get memory
       S3ObjectInputStream is = getObjectForKey(k, 0, ValueArray.CHUNK_SZ).getObjectContent();
+
       int off = 0;
       while( off < sz ) off += is.read(mem,off,sz-off);
       ValueArray ary = new ValueArray(k, sz).read(new AutoBuffer(mem));
@@ -194,11 +197,111 @@ public abstract class PersistS3 {
     return new String[] { bucket, key };
   }
 
-  public static InputStream openStream(Key k) throws IOException {
-    String[] bk = decodeKey(k);
-    GetObjectRequest r = new GetObjectRequest(bk[0], bk[1]);
-    return getClient().getObject(r).getObjectContent();
+  public static final class H2OS3InputStream extends InputStream {
+    Key _k;
+    long _off;
+    long _to;
+    S3ObjectInputStream _is;
+    ProgressMonitor _pmon;
+    public final int _retries = 3;
+    String [] _bk;
+
+    private void open(){
+      assert _is == null;
+      GetObjectRequest r = new GetObjectRequest(_bk[0], _bk[1]);
+      r.setRange(_off, _to);
+      _is = getClient().getObject(r).getObjectContent();
+    }
+    public H2OS3InputStream(Key k){
+      this(k,0,Long.MAX_VALUE);
+    }
+    public H2OS3InputStream(Key k, long from, long to){
+      _k = k;
+      _off = from;
+      _to = Math.min(DKV.get(k).length(),to);
+      _bk = decodeKey(k);
+    }
+
+    private void try2Recover(int attempt, IOException e) {
+      if(attempt == _retries) Throwables.propagate(e);
+      try{close();}catch(IOException ex){}
+      _is = null;
+      try {Thread.sleep(256 << attempt);}catch(InterruptedException ex){}
+      open();
+      return;
+    }
+
+    @Override
+    public final int available() throws IOException {
+      int attempts = 0;
+      while(true){
+        try {
+          return _is.available();
+        } catch (IOException e) {
+          try2Recover(attempts++,e);
+        }
+      }
+    }
+
+    @Override
+    public int read() throws IOException {
+      int attempts = 0;
+      while(true){
+        try{
+          return _is.read();
+        }catch (IOException e){
+          try2Recover(attempts++,e);
+        }
+      }
+    }
+
+    public int read(byte [] b) throws IOException {
+      int attempts = 0;
+      while(true){
+        try {
+          return _is.read(b);
+        } catch(IOException e) {
+          try2Recover(attempts++,e);
+        }
+      }
+    }
+
+    public int read(byte [] b, int off, int len) throws IOException {
+      int attempts = 0;
+      while(true){
+        try {
+          return _is.read(b,off,len);
+        } catch(IOException e) {
+          try2Recover(attempts++,e);
+        }
+      }
+    }
+
+    @Override
+    public void close() throws IOException {
+      if(_is != null){
+        _is.close();
+        _is = null;
+      }
+    }
+
+    @Override
+    public long skip(long n) throws IOException {
+      int attempts = 0;
+      while(true){
+        try{
+          return _is.skip(n);
+        } catch (IOException e) {
+          try2Recover(attempts++,e);
+        }
+      }
+    }
   }
+
+  public static H2OS3InputStream openStream(Key k) throws IOException {
+    return new H2OS3InputStream(k);
+  }
+
   // Gets the S3 object associated with the key that can read length bytes from offset
   private static S3Object getObjectForKey(Key k, long offset, long length) throws IOException {
     String[] bk = decodeKey(k);
