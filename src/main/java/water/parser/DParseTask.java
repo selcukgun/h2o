@@ -317,7 +317,6 @@ public class DParseTask extends MRTask {
         } else
           _nrows = new long[2];
         // launch the distributed parser on its chunks.
-        System.out.println("DParseTask::fork("+_sourceDataset._key+")");
         return fork(_sourceDataset._key);
       case XLS:
 //        throw H2O.unimpl();

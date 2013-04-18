@@ -58,8 +58,7 @@ public class CsvParser extends CustomParser {
 
   @SuppressWarnings("fallthrough")
   @Override public final void parse(Key key) {
-    System.out.println("aryKey = " + _aryKey);
-    ValueArray _ary = _aryKey == null ? null : DKV.get(_aryKey).get(ValueArray.class);
+    ValueArray ary = _aryKey == null ? null : (ValueArray)DKV.get(_aryKey).get();
     ValueString _str = new ValueString();
     byte[] bits = DKV.get(key).memOrLoad();
     int offset = 0;
@@ -75,7 +74,7 @@ public class CsvParser extends CustomParser {
     int colIdx = 0;
     byte c = bits[offset];
     // skip comments for the first chunk
-    if ((_ary == null) || (ValueArray.getChunkIndex(key) == 0)) {
+    if ((ary == null) || (ValueArray.getChunkIndex(key) == 0)) {
       while (c == '#' || c == '@'/*also treat as comments leading '@' from ARFF format*/) {
         while ((offset   < bits.length) && (bits[offset] != CHAR_CR) && (bits[offset  ] != CHAR_LF)) ++offset;
         if    ((offset+1 < bits.length) && (bits[offset] == CHAR_CR) && (bits[offset+1] == CHAR_LF)) ++offset;
@@ -412,7 +411,7 @@ NEXT_CHAR:
         ++secondChunk;
         // if we can't get further we might have been the last one and we must
         // commit the latest guy if we had one.
-        if (_ary == null) {
+        if (ary == null) {
           if ((state != EXPECT_COND_LF) && (state != POSSIBLE_EMPTY_LINE)) {
             c = CHAR_LF;
             continue MAIN_LOOP;
@@ -425,8 +424,8 @@ NEXT_CHAR:
         offset -= bits.length;
         tokenStart -= bits.length;
         long chkidx = ValueArray.getChunkIndex(key);
-        Value v = (secondChunk < 2 && chkidx+1 < _ary.chunks())
-          ? DKV.get(_ary.getChunkKey(chkidx+1)) : null;
+        Value v = (secondChunk < 2 && chkidx+1 < ary.chunks())
+          ? DKV.get(ary.getChunkKey(chkidx+1)) : null;
         // if we can't get further we might have been the last one and we must
         // commit the latest guy if we had one.
         if (v == null) {
