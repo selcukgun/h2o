@@ -249,7 +249,9 @@ public abstract class PersistS3 {
       int attempts = 0;
       while(true){
         try{
-          return _is.read();
+          int res = _is.read();
+          if(res > 0)_off += res;
+          return res;
         }catch (IOException e){
           try2Recover(attempts++,e);
         }
@@ -260,7 +262,9 @@ public abstract class PersistS3 {
       int attempts = 0;
       while(true){
         try {
-          return _is.read(b);
+          int res =  _is.read(b);
+          if(res > 0)_off += res;
+          return res;
         } catch(IOException e) {
           try2Recover(attempts++,e);
         }
@@ -271,7 +275,9 @@ public abstract class PersistS3 {
       int attempts = 0;
       while(true){
         try {
-          return _is.read(b,off,len);
+          int res = _is.read(b,off,len);;
+          if(res > 0)_off += res;
+          return res;
         } catch(IOException e) {
           try2Recover(attempts++,e);
         }
