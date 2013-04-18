@@ -220,6 +220,7 @@ public abstract class PersistS3 {
       _off = from;
       _to = Math.min(DKV.get(k).length(),to);
       _bk = decodeKey(k);
+      open();
     }
 
     private void try2Recover(int attempt, IOException e) {
