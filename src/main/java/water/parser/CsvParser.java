@@ -58,7 +58,8 @@ public class CsvParser extends CustomParser {
 
   @SuppressWarnings("fallthrough")
   @Override public final void parse(Key key) {
-    ValueArray _ary = _aryKey == null ? null : (ValueArray)DKV.get(_aryKey).get();
+    System.out.println("aryKey = " + _aryKey);
+    ValueArray _ary = _aryKey == null ? null : DKV.get(_aryKey).get(ValueArray.class);
     ValueString _str = new ValueString();
     byte[] bits = DKV.get(key).memOrLoad();
     int offset = 0;

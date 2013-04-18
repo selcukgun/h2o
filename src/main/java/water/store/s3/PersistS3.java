@@ -209,7 +209,6 @@ public abstract class PersistS3 {
     private void open(){
       assert _is == null;
       GetObjectRequest r = new GetObjectRequest(_bk[0], _bk[1]);
-      System.out.println("opening stream " + Arrays.toString(_bk) + "(" + _off + "," + _to + ")");
       r.setRange(_off, _to);
       _is = getClient().getObject(r).getObjectContent();
     }

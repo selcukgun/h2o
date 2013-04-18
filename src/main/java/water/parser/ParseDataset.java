@@ -231,6 +231,7 @@ public final class ParseDataset extends Job {
             ValueArray.readPut(_fileInfo[_idx]._okey, is);
             DKV.write_barrier(); // we have to wait until all the values are available at their target nodes before proceeding with parse!!
             v = DKV.get(_fileInfo[_idx]._okey);
+            assert v != null;
           } catch (Throwable t) {
             System.err.println("failed decompressing data " + key.toString() + " with compression " + _comp);
             throw new RuntimeException(t);
