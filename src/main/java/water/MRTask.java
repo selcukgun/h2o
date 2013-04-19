@@ -74,7 +74,6 @@ public abstract class MRTask extends DRemoteTask {
     // Reduce results into 'this' so they collapse going up the execution tree.
     // NULL out child-references so we don't accidentally keep large subtrees
     // alive: each one may be holding large partial results.
-    System.out.println("reduce(" + _lo + "," + _hi +")");
     if( _left != null ) reduceAlsoBlock(_left); _left = null;
     if( _rite != null ) reduceAlsoBlock(_rite); _rite = null;
     returnReservedMemory();
