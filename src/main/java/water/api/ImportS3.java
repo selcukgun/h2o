@@ -1,6 +1,7 @@
 package water.api;
 
 import java.io.IOException;
+import java.util.List;
 
 import water.DKV;
 import water.Key;
@@ -58,7 +59,10 @@ public class ImportS3 extends Request {
     }
     AmazonS3 s3 = PersistS3.getClient();
 
-    for( S3ObjectSummary obj : s3.listObjects(bucket,prefix).getObjectSummaries() ) {
+    long t1 = System.currentTimeMillis();
+    List<S3ObjectSummary> objs = s3.listObjects(bucket,prefix).getObjectSummaries();
+    System.out.println("retrieving object list from bucket " + bucket + " done in " + ((System.currentTimeMillis() - t1)*0.001) + "s");
+    for( S3ObjectSummary obj : objs ) {
       try {
         Key k = PersistS3.loadKey(obj);
         JsonObject o = new JsonObject();

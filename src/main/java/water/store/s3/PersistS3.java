@@ -201,6 +201,7 @@ public abstract class PersistS3 {
     Key _k;
     long _off;
     long _to;
+    long _mark;
     S3ObjectInputStream _is;
     ProgressMonitor _pmon;
     public final int _retries = 3;
@@ -233,6 +234,14 @@ public abstract class PersistS3 {
       open();
       return;
     }
+    @Override
+    public boolean markSupported(){
+      return false;
+    }
+    @Override
+    public void mark(int readLimit){throw new UnsupportedOperationException();}
+    @Override
+    public void reset(){throw new UnsupportedOperationException();}
 
     @Override
     public final int available() throws IOException {

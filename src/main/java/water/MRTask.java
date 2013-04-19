@@ -34,7 +34,6 @@ public abstract class MRTask extends DRemoteTask {
   /** Do all the keys in the list associated with this Node.  Roll up the
    * results into <em>this<em> MRTask. */
   @Override public final void compute2() {
-    System.out.println("MRTask(" + _lo + "," + _hi+"), qlen = " + H2O.getLoQueue() + ", " + H2O.getHiQueue(0));
     if( _hi-_lo >= 2 ) { // Multi-key case: just divide-and-conquer to 1 key
       final int mid = (_lo+_hi)>>>1; // Mid-point
       assert _left == null && _rite == null;
@@ -49,21 +48,20 @@ public abstract class MRTask extends DRemoteTask {
       // compute min. memory required to run the right branch in parallel
       // min memory equals to the max memory used if the right branch will be executed single threaded (but in parallel with our left branch)
       // assuming all memory is kept in the tasks and it is halved by reduce operation, the min memory is proportional to the depth of the right subtree.
-      long reqMem = (_hi - _lo) > 2?(log2(_hi - mid)+1)*memOverheadPerChunk():0;
-      if(reqMem == 0 || MemoryManager.tryReserveTaskMem(reqMem)){
-        _reservedMem += reqMem;   // Remember the amount of reserved memory to free it later.
-        _left.fork();             // Runs in another thread/FJ instance
-        _rite.compute2();             // Runs in another thread/FJ instance
-      } else {
-        System.out.println("Failed to reserve " + reqMem + "B");
-        _left.compute2();
-        _rite.compute2();
-      }
+//      long reqMem = (_hi - _lo) > 2?(log2(_hi - mid)+1)*memOverheadPerChunk():0;
+      _left.fork();
+      _rite.compute2();
+//      if(reqMem == 0 || MemoryManager.tryReserveTaskMem(reqMem)){
+//        _reservedMem += reqMem;   // Remember the amount of reserved memory to free it later.
+//        _left.fork();             // Runs in another thread/FJ instance
+//        _rite.compute2();             // Runs in another thread/FJ instance
+//      } else {
+//        _left.compute2();
+//        _rite.compute2();
+//      }
     } else {
-      if( _hi > _lo ){           // Single key?
-        System.out.println("map(" + _lo+")");
+      if( _hi > _lo )           // Single key?
         map(_keys[_lo]);        // Get it, run it locally
-      }
     }
     tryComplete();              // And this task is complete
   }
