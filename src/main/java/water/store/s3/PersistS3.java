@@ -225,6 +225,7 @@ public abstract class PersistS3 {
 
     private void try2Recover(int attempt, IOException e) {
       System.out.println("[H2OS3InputStream] Attempt("+attempt + ") to recover from " + e.getMessage() + ")");
+      e.printStackTrace();
       if(attempt == _retries) Throwables.propagate(e);
       try{close();}catch(IOException ex){}
       _is = null;

@@ -34,6 +34,7 @@ public abstract class MRTask extends DRemoteTask {
   /** Do all the keys in the list associated with this Node.  Roll up the
    * results into <em>this<em> MRTask. */
   @Override public final void compute2() {
+    System.out.println("MRTask(" + _lo + "," + _hi+"), qlen = " + H2O.getLoQueue() + ", " + H2O.getHiQueue(0));
     if( _hi-_lo >= 2 ) { // Multi-key case: just divide-and-conquer to 1 key
       final int mid = (_lo+_hi)>>>1; // Mid-point
       assert _left == null && _rite == null;
@@ -44,21 +45,25 @@ public abstract class MRTask extends DRemoteTask {
       _left._hi = mid;          // Reset mid-point
       _rite._lo = mid;          // Also set self mid-point
       setPendingCount(2);
+
       // compute min. memory required to run the right branch in parallel
       // min memory equals to the max memory used if the right branch will be executed single threaded (but in parallel with our left branch)
       // assuming all memory is kept in the tasks and it is halved by reduce operation, the min memory is proportional to the depth of the right subtree.
-      long reqMem = (log2(_hi - mid)+3)*memOverheadPerChunk();
-      if(MemoryManager.tryReserveTaskMem(reqMem)){
+      long reqMem = (_hi - _lo) > 2?(log2(_hi - mid)+1)*memOverheadPerChunk():0;
+      if(reqMem == 0 || MemoryManager.tryReserveTaskMem(reqMem)){
         _reservedMem += reqMem;   // Remember the amount of reserved memory to free it later.
         _left.fork();             // Runs in another thread/FJ instance
-        _rite.fork();             // Runs in another thread/FJ instance
+        _rite.compute2();             // Runs in another thread/FJ instance
       } else {
+        System.out.println("Failed to reserve " + reqMem + "B");
         _left.compute2();
         _rite.compute2();
       }
     } else {
-      if( _hi > _lo )           // Single key?
+      if( _hi > _lo ){           // Single key?
+        System.out.println("map(" + _lo+")");
         map(_keys[_lo]);        // Get it, run it locally
+      }
     }
     tryComplete();              // And this task is complete
   }
@@ -71,6 +76,7 @@ public abstract class MRTask extends DRemoteTask {
     // Reduce results into 'this' so they collapse going up the execution tree.
     // NULL out child-references so we don't accidentally keep large subtrees
     // alive: each one may be holding large partial results.
+    System.out.println("reduce(" + _lo + "," + _hi +")");
     if( _left != null ) reduceAlsoBlock(_left); _left = null;
     if( _rite != null ) reduceAlsoBlock(_rite); _rite = null;
     returnReservedMemory();
