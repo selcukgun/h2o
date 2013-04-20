@@ -207,11 +207,9 @@ public abstract class PersistS3 {
     public final int _retries = 3;
     String [] _bk;
 
-    private void open(){
+    protected void open(){
       assert _is == null;
-      GetObjectRequest r = new GetObjectRequest(_bk[0], _bk[1]);
-      r.setRange(_off, _to);
-      _is = getClient().getObject(r).getObjectContent();
+      _is = getClient().getObject(new GetObjectRequest(_bk[0], _bk[1]).withRange(_off, _to)).getObjectContent();
     }
     public H2OS3InputStream(Key k){
       this(k,0,Long.MAX_VALUE);
@@ -225,10 +223,10 @@ public abstract class PersistS3 {
     }
 
     private void try2Recover(int attempt, IOException e) {
-      System.out.println("[H2OS3InputStream] Attempt("+attempt + ") to recover from " + e.getMessage() + ")");
+      System.out.println("[H2OS3InputStream] Attempt("+attempt + ") to recover from " + e.getMessage() + "), off = " + _off);
       e.printStackTrace();
       if(attempt == _retries) Throwables.propagate(e);
-      try{close();}catch(IOException ex){}
+      try{_is.close();}catch(IOException ex){}
       _is = null;
       if(attempt > 0) try {Thread.sleep(256 << attempt);}catch(InterruptedException ex){}
       open();
@@ -269,6 +267,7 @@ public abstract class PersistS3 {
       }
     }
 
+    @Override
     public int read(byte [] b) throws IOException {
       int attempts = 0;
       while(true){
@@ -282,6 +281,7 @@ public abstract class PersistS3 {
       }
     }
 
+    @Override
     public int read(byte [] b, int off, int len) throws IOException {
       int attempts = 0;
       while(true){
@@ -300,7 +300,6 @@ public abstract class PersistS3 {
       if(_is != null){
         _is.close();
         _is = null;
-        _off = 0;
       }
     }
 
