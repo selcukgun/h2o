@@ -14,7 +14,6 @@ public class TaskGetKey extends DTask<TaskGetKey> {
   Key _key;                  // Set by client/sender JVM, cleared by server JVM
   Value _val;                // Set by server JVM, read by client JVM
   transient Key _xkey;       // Set by client, read by client
-  transient H2ONode _h2o;    // Set by server JVM, read by server JVM on ACKACK
   final byte _priority;
 
   // Unify multiple Key/Value fetches for the same Key from the same Node at
@@ -38,16 +37,16 @@ public class TaskGetKey extends DTask<TaskGetKey> {
         break;                  // Successful install of a fresh RPC
       }
     }
-    Value val = rpc.get()._val; // Block for, then fetch out the result
+    Value val = rpc.getResult()._val; // Block for, then fetch out the result
     TGKS.putIfMatchUnlocked(key,null,rpc); // Clear from cache
     return val;
   }
 
   private TaskGetKey( Key key, int priority ) { _key = _xkey = key; _priority = (byte)priority; }
 
-  // Top-level non-recursive invoke
-  @Override public TaskGetKey invoke( H2ONode sender ) {
-    _h2o = sender;
+
+  @Override
+  public void compute2(){
     Key k = _key;
     _key = null;          // Not part of the return result
     assert k.home();      // Gets are always from home (less we do replication)
@@ -55,10 +54,10 @@ public class TaskGetKey extends DTask<TaskGetKey> {
     // narrow race on a moving K/V mapping tracking this Value just as it gets
     // deleted - in which case, simply retry for another Value.
     do  _val = H2O.get(k);      // The return result
-    while( _val != null && !_val.setReplica(sender) );
-    return this;
+    while( _val != null && !_val.setReplica(_h2o) );
+    tryComplete();
   }
-  @Override public void compute2() { throw H2O.unimpl(); }
+
 
   // Received an ACK; executes on the node asking&receiving the Value
   @Override public void onAck() {

@@ -2,8 +2,8 @@ package water;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
-import jsr166y.ForkJoinPool;
-import water.H2O.FJWThr;
+import jsr166y.CountedCompleter;
+
 import water.H2O.H2OCountedCompleter;
 
 /**
@@ -35,9 +35,16 @@ import water.H2O.H2OCountedCompleter;
  * @version 1.0
  */
 
-public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.ManagedBlocker {
+public class RPC<V extends DTask> extends DTask implements  Delayed  {
   // The target remote node to pester for a response.  NULL'd out if the target
   // disappears or we cancel things (hence not final).
+
+  private boolean completed = false;
+  @Override
+  public void onCompletion(CountedCompleter caller){
+    assert !completed;
+    completed = true;
+  }
   H2ONode _target;
 
   // The distributed Task to execute.  Think: code-object+args while this RPC
@@ -101,6 +108,13 @@ public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.Ma
     return this;
   }
 
+  public V getResult() {
+	try {get();} catch (Exception e) {throw new RuntimeException(e);}
+	return _dt;
+  }
+
+  @Override
+  public void compute2(){call();}
   // Make an initial RPC, or re-send a packet.  Always called on 1st send; also
   // called on a timeout.
   public synchronized RPC<V> call() {
@@ -155,41 +169,10 @@ public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.Ma
     }
   }
 
-  // Similar to FutureTask.get() but does not throw any exceptions.  Returns
-  // null for canceled tasks, including those where the target dies.
-  public V get() {
-    // check priorities - FJ task can only block on a task with higher priority!
-    Thread cThr = Thread.currentThread();
-    int priority = (cThr instanceof FJWThr) ? ((FJWThr)cThr)._priority : 0;
-    assert _dt.priority() > priority || (_dt.priority() == priority && _dt instanceof DRemoteTask)
-      : "*** Attempting to block on task (" + _dt.getClass() + ") with equal or lower priority. Can lead to deadlock! " + _dt.priority() + " <=  " + priority;
-    if( _done ) return _dt; // Fast-path shortcut
-    // Use FJP ManagedBlock for this blocking-wait - so the FJP can spawn
-    // another thread if needed.
-    try { ForkJoinPool.managedBlock(this); } catch( InterruptedException e ) { }
-    if( _done ) return _dt; // Fast-path shortcut
-    assert isCancelled();
-    return null;
-  }
-  // Return true if blocking is unnecessary, which is true if the Task isDone.
-  public boolean isReleasable() {  return isDone();  }
   // Possibly blocks the current thread.  Returns true if isReleasable would
   // return true.  Used by the FJ Pool management to spawn threads to prevent
   // deadlock is otherwise all threads would block on waits.
-  public synchronized boolean block() {
-    while( !isDone() ) { try { wait(); } catch( InterruptedException e ) { } }
-    return true;
-  }
 
-  public final V get(long timeout, TimeUnit unit) {
-    if( _done ) return _dt;     // Fast-path shortcut
-    throw H2O.unimpl();
-  }
-
-  // Done if target is dead or canceled, or we have a result.
-  public final boolean isDone() {  return _target==null || _done;  }
-  // Done if target is dead or canceled
-  public final boolean isCancelled() { return _target==null; }
   // Attempt to cancel job
   public final boolean cancel( boolean mayInterruptIfRunning ) {
     boolean did = false;
@@ -202,6 +185,7 @@ public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.Ma
       }
       notifyAll();              // notify in any case
     }
+    super.cancel(mayInterruptIfRunning);
     return did;
   }
 
@@ -243,7 +227,10 @@ public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.Ma
 
     @Override public void compute2() {
       // Run the remote task on this server!
-      _dt.invoke(_client);
+      _dt.setCompleter(this);
+      _dt.fork(_client);
+    }
+    @Override public void onCompletion(CountedCompleter caller){
       // Send results back
       AutoBuffer ab = new AutoBuffer(_client).putTask(UDP.udp.ack,_tsknum).put1(SERVER_UDP_SEND);
       _dt.write(ab);                 // Write the DTask - could be very large write
@@ -322,7 +309,6 @@ public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.Ma
         assert !ab.hasTCP():"ERROR: got tcp with existing task #, FROM " + ab._h2o.toString() + " AB: " +  UDP.printx16(lo,hi);      // All the resends should be UDP only
         // DROP PACKET
       }
-
     } else if( !old._computed ) {
       // This packet has not been fully computed.  Hence it's still a work-in-
       // progress locally.  We have no answer to reply but we do not want to
@@ -384,7 +370,7 @@ public class RPC<V extends DTask> implements Future<V>, Delayed, ForkJoinPool.Ma
       _dt.onAck();              // One time only execute (before sending ACKACK)
       _done = true;             // Only read one (of many) response packets
       ab._h2o.taskRemove(_tasknum); // Flag as task-completed, even if the result is null
-      notifyAll();              // And notify in any case
+      tryComplete();
     }
   }
 

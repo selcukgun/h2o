@@ -53,7 +53,7 @@ public class Job extends Iced {
   }
 
   public void start() {
-    DKV.put(_self, new Value(_self, new byte[0]));
+    DKV.put(_self, this);
     new TAtomic<List>() {
       @Override public List atomic(List old) {
         if( old == null ) old = new List();

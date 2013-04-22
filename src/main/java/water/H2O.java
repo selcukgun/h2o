@@ -443,7 +443,7 @@ public final class H2O {
     @Override public final void compute() {
       FJWThr t = (FJWThr)Thread.currentThread();
       int pp = ((ForkJoinPool2)t.getPool())._priority;
-      assert  priority() == pp; // Job went to the correct queue?
+      //assert  priority() == pp:priority() + " != " + pp + "," + getClass().getName(); // Job went to the correct queue?
       assert t._priority <= pp; // Thread attempting the job is only a low-priority?
       // Drain the high priority queues before the normal F/J queue
       try {

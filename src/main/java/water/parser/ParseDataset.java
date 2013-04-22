@@ -1,15 +1,11 @@
 package water.parser;
 
-import java.io.*;
+import java.io.InputStream;
 import java.util.*;
 import java.util.zip.*;
 
-import sun.security.krb5.internal.PAData;
-
 import jsr166y.CountedCompleter;
-
 import water.*;
-import water.DRemoteTask.DFuture;
 import water.H2O.H2OCountedCompleter;
 import water.api.Inspect;
 import water.parser.DParseTask.Pass;
@@ -89,7 +85,6 @@ public final class ParseDataset extends Job {
       UnzipAndParseTask tsk = new UnzipAndParseTask(job, compression, setup);
       tsk.invoke(keys);
       DParseTask [] p2s = new DParseTask[keys.length];
-      DFuture [] dfs = new DFuture [keys.length];
       DParseTask phaseTwo = DParseTask.createPassTwo(tsk._tsk);
       // too keep original order of the keys...
       HashMap<Key, FileInfo> fileInfo = new HashMap<Key, FileInfo>();
@@ -104,15 +99,14 @@ public final class ParseDataset extends Job {
         for(j = 0; j < finfo._nrows.length; ++j)
           finfo._nrows[j] += rowCount;
         rowCount += nrows;
-        p2s[i] = new DParseTask(phaseTwo, finfo);
-        dfs[i] = p2s[i].fork(k);
+        p2s[i] = (DParseTask)new DParseTask(phaseTwo, finfo).fork(k);
       }
       phaseTwo._sigma = new double[ncolumns];
       phaseTwo._invalidValues = new long[ncolumns];
       // now put the results together and create ValueArray header
       for(int i = 0; i < p2s.length; ++i){
         DParseTask t = p2s[i];
-        dfs[i].get();
+        p2s[i].get();
         for (j = 0; j < phaseTwo._ncolumns; ++j) {
           phaseTwo._sigma[j] += t._sigma[j];
           phaseTwo._invalidValues[j] += t._invalidValues[j];
@@ -175,7 +169,6 @@ public final class ParseDataset extends Job {
     final ParseDataset _job;
     final Compression _comp;
     DParseTask _tsk;
-    transient DFuture [] _fs;
     FileInfo [] _fileInfo;
     final byte _sep;
     final int _ncolumns;
@@ -191,16 +184,31 @@ public final class ParseDataset extends Job {
       _headers = (setup._header)?setup._data[0]:null;
     }
 
+    static private class UnzipProgressMonitor implements ProgressMonitor {
+      int _counter = 0;
+      Key _progress;
+
+      public UnzipProgressMonitor(Key progress){_progress = progress;}
+      @Override
+      public void update(long n) {
+        n += _counter;
+        if(n > (1 << 20)){
+          onProgress(n, _progress);
+          _counter = 0;
+        } else
+          _counter = (int)n;
+      }
+
+    }
     // actual implementation of unzip and parse, intedned for the FJ computation
     private class UnzipAndParseLocalTask extends H2OCountedCompleter {
       final int _idx;
-      private DFuture _ft;
-
       public UnzipAndParseLocalTask(int idx){
         _idx = idx;
         setCompleter(UnzipAndParseTask.this);
       }
 
+      protected  DParseTask _p1;
       @Override
       public void compute2() {
         final Key key = _keys[_idx];
@@ -209,12 +217,13 @@ public final class ParseDataset extends Job {
         _fileInfo[_idx]._okey = key;
         Value v = DKV.get(key);
         assert v != null;
+        long sizeDiff = v.length();
         if(_comp != Compression.NONE){
-          InputStream is = null;;
+          InputStream is = null;
           try {
             switch(_comp){
             case ZIP:
-              ZipInputStream zis = new ZipInputStream(v.openStream());
+              ZipInputStream zis = new ZipInputStream(v.openStream(new UnzipProgressMonitor(_job._progress)));
               ZipEntry ze = zis.getNextEntry();
               // There is at least one entry in zip file and it is not a directory.
               if (ze == null || ze.isDirectory())
@@ -222,7 +231,7 @@ public final class ParseDataset extends Job {
               is = zis;
               break;
             case GZIP:
-              is = new GZIPInputStream(v.openStream());
+              is = new GZIPInputStream(v.openStream(new UnzipProgressMonitor(_job._progress)));
               break;
             default:
               throw H2O.unimpl();
@@ -230,6 +239,9 @@ public final class ParseDataset extends Job {
             _fileInfo[_idx]._okey = Key.make(new String(key._kb) + "_UNZIPPED");
             ValueArray.readPut(_fileInfo[_idx]._okey, is,_job);
             v = DKV.get(_fileInfo[_idx]._okey);
+            sizeDiff = v.length() - sizeDiff;
+            if(sizeDiff != 0)
+              onProgressSizeChange(sizeDiff, _job);
             assert v != null;
           } catch (Throwable t) {
             System.err.println("failed decompressing data " + key.toString() + " with compression " + _comp);
@@ -246,30 +258,31 @@ public final class ParseDataset extends Job {
           for(int i = 0; i < setup._data[0].length; ++i)
             _fileInfo[_idx]._header = _fileInfo[_idx]._header && setup._data[0][i].equalsIgnoreCase(_headers[i]);
         setup = new CsvParser.Setup(_sep, _fileInfo[_idx]._header, setup._data, setup._numlines, setup._bits);
-        _ft = DParseTask.createPassOne(v, _job, _pType).passOne(setup);
-        tryComplete();
+        _p1 = DParseTask.createPassOne(v, _job, _pType);
+        _p1.setCompleter(this);
+        _p1.passOne(setup);
+        // DO NOT call tryComplete here, _p1 calls it!
       }
-      public DParseTask getResult(){
-        DParseTask tsk = (DParseTask)_ft.get();
-        _fileInfo[_idx]._nrows = tsk._nrows;
+      @Override
+      public void onCompletion(CountedCompleter caller){
+        _fileInfo[_idx]._nrows = _p1._nrows;
         long numRows = 0;
-        for(int i = 0; i < tsk._nrows.length; ++i){
-          numRows += tsk._nrows[i];
+        for(int i = 0; i < _p1._nrows.length; ++i){
+          numRows += _p1._nrows[i];
           _fileInfo[_idx]._nrows[i] = numRows;
         }
-        return tsk;
       }
     }
 
     @Override
     // Must override not to flatten the keys (which we do not really want to do here)
-    public DFuture fork(Key... keys) {
+    public DRemoteTask fork(Key... keys) {
       _keys = keys;
-      return dfork();
+      fork();
+      return this;
     }
     @Override
-    public void compute2() {
-      _fs = new DFuture [_keys.length];
+    public void localCompute() {
       _fileInfo = new FileInfo[_keys.length];
       subTasks = new UnzipAndParseLocalTask[_keys.length];
       setPendingCount(subTasks.length);
@@ -280,10 +293,10 @@ public final class ParseDataset extends Job {
 
     transient UnzipAndParseLocalTask [] subTasks;
     @Override
-    public final void onCompletion(CountedCompleter caller){
-      _tsk = subTasks[0].getResult();
+    public final void onLocalCompletion(){
+      _tsk = subTasks[0]._p1;
       for(int i = 1; i < _keys.length; ++i){
-        DParseTask tsk = subTasks[i].getResult();
+        DParseTask tsk = subTasks[i]._p1;
         tsk._nrows = _tsk._nrows;
         _tsk.reduce(tsk);
       }
@@ -351,5 +364,16 @@ public final class ParseDataset extends Job {
         return old;
       }
     }.fork(progress);
+  }
+  static final void onProgressSizeChange(final long len, final ParseDataset job) {
+    new TAtomic<ParseDataset>() {
+      @Override
+      public ParseDataset atomic(ParseDataset old) {
+        if (old == null)
+          return null;
+        old._total += len;
+        return old;
+      }
+    }.fork(job.self());
   }
 }

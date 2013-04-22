@@ -380,7 +380,6 @@ public abstract class DGLM {
       super.init();
       _ary = DKV.get(_aryKey).get();
       _models = new Key[_folds];
-
     }
 
     @Override
@@ -406,7 +405,9 @@ public abstract class DGLM {
     @Override
     public void reduce(DRemoteTask drt) {
       GLMXValTask other = (GLMXValTask)drt;
-      if(other._models != _models){
+      if(_models == null)
+        _models = other._models;
+      else if(other._models != _models){
         for(int i = 0; i < _models.length; ++i)
           if(_models[i] == null)
             _models[i] = other._models[i];

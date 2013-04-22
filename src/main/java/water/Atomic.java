@@ -17,7 +17,7 @@ public abstract class Atomic extends DTask {
   // the new Value (and the function is retried until it runs atomically).  The
   // original Value is supposed to be read-only.  If the original Key misses
   // (no Value), one is created with 0 length and wrong Value._type to allow
-  // the Key to passed in (as part of the Value) 
+  // the Key to passed in (as part of the Value)
   abstract public Value atomic( Value val );
 
   /** Executed on the transaction key's <em>home</em> node after any successful
@@ -26,13 +26,10 @@ public abstract class Atomic extends DTask {
    */
   public void onSuccess(){}
 
-  // Only invoked remotely; this is now the key's home and can be directly executed
-  @Override public final Atomic invoke( H2ONode sender ) {  compute2(); return this; }
-
   /** Block until it completes, even if run remotely */
   public final Atomic invoke( Key key ) {
     RPC<Atomic> rpc = fork(key);
-    if( rpc != null ) rpc.get(); // Block for it
+    if( rpc != null ) rpc.getResult(); // Block for it
     return this;
   }
 

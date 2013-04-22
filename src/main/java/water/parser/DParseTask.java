@@ -293,7 +293,7 @@ public class DParseTask extends MRTask {
    *
    * @throws Exception
    */
-  public DFuture passOne(CsvParser.Setup setup) {
+  public void passOne(CsvParser.Setup setup) {
     switch (_parserType) {
     case CSV:
         // precompute the parser setup, column setup and other settings
@@ -303,7 +303,7 @@ public class DParseTask extends MRTask {
         }
         if (setup._data == null) {
           _error= "Unable to determine the separator or number of columns on the dataset";
-          return null;
+          throw new Error(_error);
         }
         _colNames = setup._data[0];
         setColumnNames(_colNames);
@@ -317,7 +317,8 @@ public class DParseTask extends MRTask {
         } else
           _nrows = new long[2];
         // launch the distributed parser on its chunks.
-        return fork(_sourceDataset._key);
+        fork(_sourceDataset._key);
+        break;
       case XLS:
 //        throw H2O.unimpl();
         // XLS parsing is not distributed, just obtain the value stream and

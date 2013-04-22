@@ -23,8 +23,8 @@ public abstract class DKV {
     }
   }
   static public Value put( Key key, Iced v ) { return put(key,v,null); }
-  static public Value put( Key key, Iced v, Futures fs ) { 
-    return put(key,new Value(key,v),fs); 
+  static public Value put( Key key, Iced v, Futures fs ) {
+    return put(key,new Value(key,v),fs);
   }
 
   // Remove this Key
@@ -79,7 +79,7 @@ public abstract class DKV {
     for( H2ONode h2o : H2O.CLOUD._memary )
       for( RPC rpc : h2o.tasks() )
         if( rpc._dt instanceof TaskPutKey || rpc._dt instanceof Atomic )
-          rpc.get();
+          rpc.getResult();
   }
 
   // User-Weak-Get a Key from the distributed cloud.

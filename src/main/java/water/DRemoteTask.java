@@ -1,8 +1,9 @@
 package water;
 import java.util.ArrayList;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+
+import jsr166y.CountedCompleter;
 
 import com.google.common.base.Throwables;
 
@@ -39,17 +40,22 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
     for( Key arg : args ) DKV.remove(arg);
   }
 
-
-  // Top-level remote execution hook (called from RPC).  Was passed the keys to
-  // execute in _arg.  Fires off jobs to remote machines based on Keys.
-  @Override public DRemoteTask invoke( H2ONode sender ) { return dfork().get(); }
-
   // Invoked with a set of keys
-  public DRemoteTask invoke( Key... keys ) { return fork(keys).get(); }
-  public DFuture fork( Key... keys ) { _keys = flatten(keys); return dfork(); }
+  public DRemoteTask invoke( Key... keys ) {
+    try{fork(keys).get();}catch(Exception e){throw new Error(e);}
+  	return this;
+  }
+  public DRemoteTask fork( Key... keys ) { _keys = flatten(keys); H2O.submitTask(this); return this;}
 
-  public DFuture dfork( ) {
+  private transient boolean _localCompute = false;
 
+  public boolean isLocalCompute(){return _localCompute;}
+  protected abstract void localCompute();
+
+  transient RPC<DRemoteTask> _left;
+  RPC<DRemoteTask> _rite;
+  DRemoteTask _local;
+  protected void dCompute(){
     // Split out the keys into disjointly-homed sets of keys.
     // Find the split point.  First find the range of home-indices.
     H2O cloud = H2O.CLOUD;
@@ -59,7 +65,6 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
       if( i<lo ) lo=i;
       if( i>hi ) hi=i;        // lo <= home(keys) <= hi
     }
-
     // Classic fork/join, but on CPUs.
     // Split into 3 arrays of keys: lo keys, hi keys and self keys
     final ArrayList<Key> locals = new ArrayList<Key>();
@@ -73,52 +78,56 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
       else if( idx < mid )  lokeys.add(k);
       else                  hikeys.add(k);
     }
-
     // Launch off 2 tasks for the other sets of keys, and get a place-holder
     // for results to block on.
-    DFuture f = new DFuture(remote_compute(lokeys), remote_compute(hikeys));
-
+    setPendingCount(Math.min(locals.size(),1) + Math.min(lokeys.size(),1)+Math.min(hikeys.size(),1));
+    RPC<DRemoteTask> l = null,r = null;
+    if(!lokeys.isEmpty()){
+      l = new RPC<DRemoteTask>(lokeys.get(0).home_node(),clone());
+      l.setCompleter(this);
+      l._dt._keys = lokeys.toArray(new Key[lokeys.size()]);
+      l.fork();
+    }
+    if(!hikeys.isEmpty()){
+      r = new RPC<DRemoteTask>(hikeys.get(0).home_node(),clone());
+      r.setCompleter(this);
+      r._dt._keys = hikeys.toArray(new Key[hikeys.size()]);
+      r.fork();
+    }
     // Setup for local recursion: just use the local keys.
-    _keys = locals.toArray(new Key[locals.size()]); // Keys, including local keys (if any)
     if( _keys.length != 0 ) {   // Shortcut for no local work
-      init();                   // One-time top-level init
-      H2O.submitTask(this);// Begin normal execution on a FJ thread
+      _local = clone();
+      _local._keys = locals.toArray(new Key[locals.size()]); // Keys, including local keys (if any)
+      _local.init();                   // One-time top-level init
+      _local._localCompute = true;
+      _local.localCompute();
     }
-    return f;             // Block for results from the log-tree splits
+    _left = l;
+    _rite = r;
+    tryComplete();
+  }
+  @Override
+  public final void compute2() {
+  	if(_localCompute) localCompute(); else dCompute();
   }
 
-  // Junk class only used to allow blocking all results, both local & remote
-  public class DFuture {
-    private final RPC<DRemoteTask> _lo, _hi;
-    DFuture(RPC<DRemoteTask> lo, RPC<DRemoteTask> hi ) {
-      _lo = lo;  _hi = hi;
-    }
-    // Block until completed, without having to catch exceptions
-    public DRemoteTask get() {
-      try {
-        if( _keys.length != 0 )
-          DRemoteTask.this.get(); // Block until the self-task is done
-      } catch( InterruptedException ie ) {
-        throw new RuntimeException(ie);
-      } catch( ExecutionException ee ) {
-        throw new RuntimeException(ee);
-      }
-      // Block for remote exec & reduce results into _drt
-      if( _lo != null ) reduce(_lo.get());
-      if( _hi != null ) reduce(_hi.get());
-      if( _fs != null ) _fs.blockForPending(); // Block on all other pending tasks, also
-      return DRemoteTask.this;
-    }
-  };
+  public void onLocalCompletion(){}
 
-  private final RPC<DRemoteTask> remote_compute( ArrayList<Key> keys ) {
-    if( keys.size() == 0 ) return null;
-    DRemoteTask rpc = clone();
-    rpc._keys = keys.toArray(new Key[keys.size()]);
-
-    return RPC.call(keys.get(0).home_node(), rpc);// keep the same priority
+  private boolean done = false;
+  @Override
+  public final void onCompletion(CountedCompleter caller){
+    assert !done;
+    done = true;
+    if(_localCompute)
+      onLocalCompletion();
+    else{
+      assert _left == null || _left._done;
+      assert _rite == null || _rite._done;
+      if(_local != null)reduce(_local);
+      if(_left != null)reduce(_left._dt);
+      if(_rite != null)reduce(_rite._dt);
+    }
   }
-
   private final Key[] flatten( Key[] args ) {
     if( args.length==1 ) {
       Value val = DKV.get(args[0]);

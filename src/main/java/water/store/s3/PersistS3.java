@@ -211,11 +211,12 @@ public abstract class PersistS3 {
       assert _is == null;
       _is = getClient().getObject(new GetObjectRequest(_bk[0], _bk[1]).withRange(_off, _to)).getObjectContent();
     }
-    public H2OS3InputStream(Key k){
-      this(k,0,Long.MAX_VALUE);
+    public H2OS3InputStream(Key k, ProgressMonitor pmon){
+      this(k,pmon,0,Long.MAX_VALUE);
     }
-    public H2OS3InputStream(Key k, long from, long to){
+    public H2OS3InputStream(Key k, ProgressMonitor pmon, long from, long to){
       _k = k;
+      _pmon = pmon;
       _off = from;
       _to = Math.min(DKV.get(k).length()-1,to);
       _bk = decodeKey(k);
@@ -259,7 +260,10 @@ public abstract class PersistS3 {
       while(true){
         try{
           int res = _is.read();
-          if(res != -1)_off += 1;
+          if(res != -1){
+            _off += 1;
+            if(_pmon != null)_pmon.update(1);
+          }
           return res;
         }catch (IOException e){
           try2Recover(attempts++,e);
@@ -273,7 +277,10 @@ public abstract class PersistS3 {
       while(true){
         try {
           int res =  _is.read(b);
-          if(res > 0)_off += res;
+          if(res > 0){
+            _off += res;
+            if(_pmon != null)_pmon.update(res);
+          }
           return res;
         } catch(IOException e) {
           try2Recover(attempts++,e);
@@ -287,7 +294,10 @@ public abstract class PersistS3 {
       while(true){
         try {
           int res = _is.read(b,off,len);;
-          if(res > 0)_off += res;
+          if(res > 0){
+            _off += res;
+            if(_pmon != null)_pmon.update(res);
+          }
           return res;
         } catch(IOException e) {
           try2Recover(attempts++,e);
@@ -309,7 +319,10 @@ public abstract class PersistS3 {
       while(true){
         try{
           long res = _is.skip(n);
-          if(res > 0)_off += res;
+          if(res > 0){
+            _off += res;
+            if(_pmon != null)_pmon.update(res);
+          }
           return res;
         } catch (IOException e) {
           try2Recover(attempts++,e);
@@ -318,8 +331,9 @@ public abstract class PersistS3 {
     }
   }
 
-  public static H2OS3InputStream openStream(Key k) throws IOException {
-    return new H2OS3InputStream(k);
+
+  public static H2OS3InputStream openStream(Key k,ProgressMonitor pmon) throws IOException {
+    return new H2OS3InputStream(k,pmon);
   }
 
   // Gets the S3 object associated with the key that can read length bytes from offset

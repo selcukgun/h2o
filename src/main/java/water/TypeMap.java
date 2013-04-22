@@ -87,6 +87,7 @@ public class TypeMap {
     "water.MRTask",
     "water.Model",
     "water.NOPTask",
+    "water.RPC",
     "water.TAtomic",
     "water.TaskGetKey",
     "water.TaskInvalidateKey",

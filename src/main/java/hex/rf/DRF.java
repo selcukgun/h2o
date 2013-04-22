@@ -86,13 +86,13 @@ public final class DRF extends water.DRemoteTask {
   /** Create DRF task, execute it and returns DFuture.
    *  Caller can block on the future to wait till execution finish.
    */
-  public static final DRFFuture execute(Key modelKey, int[] cols, ValueArray ary, int ntrees, int depth, int binLimit,
+  public static final DRF execute(Key modelKey, int[] cols, ValueArray ary, int ntrees, int depth, int binLimit,
       StatType stat, long seed, boolean parallelTrees, double[] classWt, int numSplitFeatures,
       Sampling.Strategy samplingStrategy, float sample, int[] strataSamples, int verbose, int exclusiveSplitLimit) {
     final DRF drf = create(modelKey, cols, ary, ntrees, depth, binLimit, stat, seed, parallelTrees, classWt, numSplitFeatures, samplingStrategy, sample, strataSamples, verbose, exclusiveSplitLimit);
     drf._job = new Job(jobName(drf), modelKey);
     drf._job.start();
-    return drf.new DRFFuture(drf.fork(drf.aryKey()));
+    return (DRF)drf.fork(drf.aryKey());
   }
 
   private static String jobName(final DRF drf) {
@@ -148,23 +148,7 @@ public final class DRF extends water.DRemoteTask {
     // Push the RFModel globally first
     UKV.put(modelKey, drf._rfmodel);
     DKV.write_barrier();
-
     return drf;
-  }
-
-  /** Hacky class to remove {@link Job} correctly.
-   *
-   * NOTE: need to be refined after new cyprien's jobs will be merged. */
-  public final class DRFFuture {
-    private final DFuture _future;
-    private DRFFuture(final DFuture deleg) { super(); _future = deleg; }
-    public DRF get() {
-      // Block to the end of DRF.
-      final DRF drf = (DRF) _future.get();
-      // Remove DRF job.
-      if (drf._job != null) drf._job.remove();
-      return drf;
-    }
   }
 
   /**Class columns that are not enums are not supported as we ony do classification and not (yet) regression.
@@ -188,7 +172,7 @@ public final class DRF extends water.DRemoteTask {
   /**Inhale the data, build a DataAdapter and kick-off the computation.
    * */
   @Override
-  public final void compute2() {
+  public final void localCompute() {
     Timer t_extract = new Timer();
     // Build data adapter for this node.
     DataAdapter dapt = DABuilder.create(this).build(_keys);

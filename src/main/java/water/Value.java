@@ -287,7 +287,7 @@ public class Value extends Iced implements ForkJoinPool.ManagedBlocker {
     else if(onHDFS())
       return PersistHdfs.openStream(_key);
     else if(onS3())
-      return PersistS3.openStream(_key);
+      return PersistS3.openStream(_key,p);
     if(isArray())
       return ((ValueArray)get()).openStream(p);
     assert _type==TypeMap.PRIM_B;

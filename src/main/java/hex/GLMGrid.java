@@ -84,15 +84,9 @@ public class GLMGrid extends Job {
         }
         fs.blockForPending();
       }catch(JobCancelledException e){/* do not need to do anything here but stop the execution*/}
-    }
-
-    @Override
-    public GridTask invoke(H2ONode client){
-      compute2();
       // don't send input data back!
       _job = null;
       _aryKey = null;
-      return this;
     }
   }
   @Override

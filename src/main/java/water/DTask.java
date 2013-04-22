@@ -23,9 +23,7 @@ public abstract class DTask<T> extends H2OCountedCompleter implements Freezable 
   // result does NOT need to get the entire result again, just that the client
   // needs more time to process the TCP result.
   transient boolean _repliedTcp; // Any return/reply/result was sent via TCP
-
-  /** Top-level remote execution hook.  Called on the <em>remote</em>. */
-  abstract public T invoke( H2ONode sender );
+  transient H2ONode _h2o;
 
   /** 2nd top-level execution hook.  After the primary task has received a
    * result (ACK) and before we have sent an ACKACK, this method is executed
@@ -38,6 +36,12 @@ public abstract class DTask<T> extends H2OCountedCompleter implements Freezable 
    * vm are available here.
    */
   public void onAckAck() {}
+
+  public DTask<T> fork(H2ONode sender) {
+    _h2o = sender;
+    fork();
+    return this;
+  }
 
   // The abstract methods to be filled in by subclasses.  These are automatically
   // filled in by any subclass of DTask during class-load-time, unless one
