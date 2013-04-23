@@ -412,7 +412,7 @@ public final class H2O {
 
   // Normal-priority work is generally directly-requested user ops.
   private static final ForkJoinPool2 FJP_NORM = new ForkJoinPool2(NORM_PRIORITY,99);
-  private static final ForkJoinPool  FJP_MIN  = new ForkJoinPool2(MIN_PRIORITY,NUMCPUS);
+  private static final ForkJoinPool2  FJP_MIN  = new ForkJoinPool2(MIN_PRIORITY,NUMCPUS);
   // Hi-priority work, sorted into individual queues per-priority.
   // Capped at a small number of threads per pool.
   private static final ForkJoinPool2 FJPS[] = new ForkJoinPool2[MAX_PRIORITY+1];
@@ -420,6 +420,7 @@ public final class H2O {
     for( int i=MIN_HI_PRIORITY; i<=MAX_PRIORITY; i++ )
       FJPS[i] = new ForkJoinPool2(i,NUMCPUS); // 1 thread per pool
     FJPS[H2O.NORM_PRIORITY] = FJP_NORM;
+    FJPS[H2O.MIN_PRIORITY] = FJP_MIN;
   }
 
   // Easy peeks at the low FJ queue
