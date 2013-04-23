@@ -183,7 +183,12 @@ public final class ParseDataset extends Job {
       _pType = setup._pType;
       _headers = (setup._header)?setup._data[0]:null;
     }
-
+    @Override
+    public DRemoteTask fork( Key... keys ) {
+      _keys = keys;
+      H2O.submitTask(this);
+      return this;
+    }
     static private class UnzipProgressMonitor implements ProgressMonitor {
       int _counter = 0;
       Key _progress;
@@ -274,13 +279,6 @@ public final class ParseDataset extends Job {
       }
     }
 
-    @Override
-    // Must override not to flatten the keys (which we do not really want to do here)
-    public DRemoteTask fork(Key... keys) {
-      _keys = keys;
-      fork();
-      return this;
-    }
     @Override
     public void localCompute() {
       _fileInfo = new FileInfo[_keys.length];

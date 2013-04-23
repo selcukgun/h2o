@@ -42,7 +42,9 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
 
   // Invoked with a set of keys
   public DRemoteTask invoke( Key... keys ) {
-    try{fork(keys).get();}catch(Exception e){throw new Error(e);}
+    assert keys != null;
+    fork(keys);
+    try{get();}catch(Exception e){throw new Error(e);}
   	return this;
   }
   public DRemoteTask fork( Key... keys ) { _keys = flatten(keys); H2O.submitTask(this); return this;}
@@ -95,7 +97,7 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
       r.fork();
     }
     // Setup for local recursion: just use the local keys.
-    if( _keys.length != 0 ) {   // Shortcut for no local work
+    if( !locals.isEmpty() ) {   // Shortcut for no local work
       _local = clone();
       _local._keys = locals.toArray(new Key[locals.size()]); // Keys, including local keys (if any)
       _local.init();                   // One-time top-level init

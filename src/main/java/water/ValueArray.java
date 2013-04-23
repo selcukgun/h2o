@@ -400,6 +400,7 @@ public class ValueArray extends Iced implements Cloneable {
       DKV.put(ckey,new Value(ckey,Arrays.copyOf(buf,off)),fs);
     }
     UKV.put(key,new ValueArray(key,szl),fs);
+    fs.blockForPending();
     return fs;
   }
 
