@@ -55,7 +55,7 @@ public abstract class MRTask extends DRemoteTask {
       if(reqMem == 0 || MemoryManager.tryReserveTaskMem(reqMem)){
         _reservedMem += reqMem;   // Remember the amount of reserved memory to free it later.
         assert _left != _rite;
-        _left.fork();             // Runs in another thread/FJ instance
+        H2O.submitTask(_left);             // Runs in another thread/FJ instance
         _rite.localCompute();             // Runs in another thread/FJ instance
       } else {
         assert _left != _rite;

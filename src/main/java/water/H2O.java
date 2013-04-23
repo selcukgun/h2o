@@ -382,7 +382,8 @@ public final class H2O {
   public static final byte    PUT_KEY_PRIORITY = MAX_PRIORITY-4;
   public static final byte     ATOMIC_PRIORITY = MAX_PRIORITY-5;
   public static final byte     MIN_HI_PRIORITY = MAX_PRIORITY-5;
-  public static final byte        MIN_PRIORITY = 0;
+  public static final byte       NORM_PRIORITY = 2;
+  public static final byte        MIN_PRIORITY = 1;
 
   // F/J threads that remember the priority of the last task they started
   // working on.
@@ -402,19 +403,23 @@ public final class H2O {
   // A standard FJ Pool, with an expected priority level.
   private static class ForkJoinPool2 extends ForkJoinPool {
     public final int _priority;
-    ForkJoinPool2(int p, int cap) { super(NUMCPUS,new FJWThrFact(cap),null,false); _priority = p; }
+    ForkJoinPool2(int p, int cap) { super(NUMCPUS-1,new FJWThrFact(cap),null,false); _priority = p; }
     public H2OCountedCompleter poll() { return (H2OCountedCompleter)pollSubmission(); }
   }
 
+
+
+
   // Normal-priority work is generally directly-requested user ops.
-  private static final ForkJoinPool2 FJP_NORM = new ForkJoinPool2(MIN_PRIORITY,99);
+  private static final ForkJoinPool2 FJP_NORM = new ForkJoinPool2(NORM_PRIORITY,99);
+  private static final ForkJoinPool  FJP_MIN  = new ForkJoinPool2(MIN_PRIORITY,NUMCPUS);
   // Hi-priority work, sorted into individual queues per-priority.
   // Capped at a small number of threads per pool.
   private static final ForkJoinPool2 FJPS[] = new ForkJoinPool2[MAX_PRIORITY+1];
   static {
     for( int i=MIN_HI_PRIORITY; i<=MAX_PRIORITY; i++ )
       FJPS[i] = new ForkJoinPool2(i,NUMCPUS); // 1 thread per pool
-    FJPS[0] = FJP_NORM;
+    FJPS[H2O.NORM_PRIORITY] = FJP_NORM;
   }
 
   // Easy peeks at the low FJ queue
@@ -426,8 +431,14 @@ public final class H2O {
   // Submit to the correct priority queue
   public static void submitTask( H2OCountedCompleter task ) {
     int priority = task.priority();
-    assert MIN_PRIORITY <= priority && priority <= MAX_PRIORITY;
+    assert NORM_PRIORITY <= priority && priority <= MAX_PRIORITY;
     FJPS[priority].submit(task);
+  }
+
+  // Start the new task (for tasks which ARE NOT running locally yet).
+  // @tart is delayed until there is spare cpu core to run the task.
+  public static void startNewTask(H2OCountedCompleter task) {
+    FJP_MIN.submit(task);
   }
 
   // Simple wrapper over F/J CountedCompleter to support priority queues.  F/J
@@ -467,7 +478,7 @@ public final class H2O {
     // In order to prevent deadlock, threads that block waiting for a reply
     // from a remote node, need the remote task to run at a higher priority
     // than themselves.  This field tracks the required priority.
-    public byte priority() { return MIN_PRIORITY; }
+    public byte priority() { return NORM_PRIORITY; }
     // Do not silently ignore uncaught exceptions!
     public boolean onExceptionalCompletion( Throwable ex, CountedCompleter caller ) {
       ex.printStackTrace();

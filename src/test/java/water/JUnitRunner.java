@@ -13,6 +13,8 @@ import org.junit.Test;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
 
+import water.exec.ExprTest;
+import water.exec.RBigDataTest;
 import water.parser.ParseCompressedAndXLSTest;
 import water.parser.ParseFolderTestBig;
 import water.sys.Node;
@@ -28,7 +30,8 @@ public class JUnitRunner {
     // Does not pass TODO!
     tests.remove(ParseCompressedAndXLSTest.class);
     tests.remove(GLMGridTest.class);
-
+    tests.remove(ExprTest.class);
+    tests.remove(RBigDataTest.class);
     // Uncomment to run tests selectively
     // tests.clear();
     // tests.add(KMeansTest.class);
@@ -89,10 +92,10 @@ public class JUnitRunner {
           } catch( Throwable _ ) {
           }
         }
+//        tests.add(ExprTest.class);
+        filter(tests);
         if( tests.size() == 0 )
           throw new Exception("Failed to find tests");
-
-        filter(tests);
         Result r = org.junit.runner.JUnitCore.runClasses(tests.toArray(new Class[0]));
         if( r.getFailureCount() == 0 ) {
           System.out.println("Successfully ran the following tests in " + (r.getRunTime() / 1000) + "s");

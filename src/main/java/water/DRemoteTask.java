@@ -88,13 +88,13 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
       l = new RPC<DRemoteTask>(lokeys.get(0).home_node(),clone());
       l.setCompleter(this);
       l._dt._keys = lokeys.toArray(new Key[lokeys.size()]);
-      l.fork();
+      H2O.submitTask(l);
     }
     if(!hikeys.isEmpty()){
       r = new RPC<DRemoteTask>(hikeys.get(0).home_node(),clone());
       r.setCompleter(this);
       r._dt._keys = hikeys.toArray(new Key[hikeys.size()]);
-      r.fork();
+      H2O.submitTask(r);
     }
     // Setup for local recursion: just use the local keys.
     if( !locals.isEmpty() ) {   // Shortcut for no local work
@@ -102,7 +102,7 @@ public abstract class DRemoteTask extends DTask<DRemoteTask> implements Cloneabl
       _local._keys = locals.toArray(new Key[locals.size()]); // Keys, including local keys (if any)
       _local.init();                   // One-time top-level init
       _local._localCompute = true;
-      _local.localCompute();
+      H2O.startNewTask(_local); // start the local computation (delayed until there is an idle cpu core)
     }
     _left = l;
     _rite = r;
