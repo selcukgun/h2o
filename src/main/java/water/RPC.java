@@ -354,6 +354,18 @@ public class RPC<V extends DTask> extends DTask implements  Delayed  {
     new AutoBuffer(ab._h2o).putTask(UDP.udp.ackack.ordinal(),task).close();
   }
 
+  private static class ResponseHandler extends H2OCountedCompleter {
+    final RPC _rpc;
+    public ResponseHandler (RPC rpc){_rpc = rpc;}
+    @Override
+    public void compute2(){
+      _rpc._dt.onAck();
+      _rpc._done = true;             // Only read one (of many) response packets
+      _rpc.tryComplete();
+    }
+    @Override
+    public byte priority(){return _rpc._dt.priority();}
+  }
   // Got a response UDP packet, or completed a large TCP answer-receive.
   // Install it as The Answer packet and wake up anybody waiting on an answer.
   protected void response( AutoBuffer ab ) {
@@ -367,10 +379,8 @@ public class RPC<V extends DTask> extends DTask implements  Delayed  {
       UDPTimeOutThread.PENDING.remove(this);
       _dt.read(ab);             // Read the answer (under lock?)
       ab.close();               // Also finish the read (under lock?)
-      _dt.onAck();              // One time only execute (before sending ACKACK)
-      _done = true;             // Only read one (of many) response packets
       ab._h2o.taskRemove(_tasknum); // Flag as task-completed, even if the result is null
-      tryComplete();
+      H2O.submitTask(new ResponseHandler(this));
     }
   }
 
