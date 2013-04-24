@@ -360,7 +360,7 @@ public class RPC<V extends DTask> extends DTask implements  Delayed  {
     assert _tasknum==ab.getTask();
     if( _done ) { assert !ab.hasTCP();ab.close(); return; } // Ignore duplicate response packet
     int flag = ab.getFlag();    // Must read flag also, to advance ab
-    if( flag == SERVER_TCP_SEND ) { ab.close(); return; } // Ignore UDP packet for a TCP reply
+    if( flag == SERVER_TCP_SEND ) {  assert !ab.hasTCP(); ab.close(); return; } // Ignore UDP packet for a TCP reply
     assert flag == SERVER_UDP_SEND;
     synchronized(this) {        // Install the answer under lock
       if( _done ) { assert !ab.hasTCP();ab.close(); return; } // Ignore duplicate response packet
