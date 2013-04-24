@@ -360,7 +360,6 @@ public class RPC<V extends DTask> extends DTask implements  Delayed  {
     @Override
     public void compute2(){
       _rpc._dt.onAck();
-      _rpc._done = true;             // Only read one (of many) response packets
       _rpc.tryComplete();
     }
     @Override
@@ -376,6 +375,7 @@ public class RPC<V extends DTask> extends DTask implements  Delayed  {
     assert flag == SERVER_UDP_SEND;
     synchronized(this) {        // Install the answer under lock
       if( _done ) { assert !ab.hasTCP();ab.close(); return; } // Ignore duplicate response packet
+      _done = true;
       UDPTimeOutThread.PENDING.remove(this);
       _dt.read(ab);             // Read the answer (under lock?)
       ab.close();               // Also finish the read (under lock?)
