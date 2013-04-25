@@ -56,8 +56,9 @@ public class TCPReceiverThread extends Thread {
         case timeline: TimeLine.tcp_call(ab); break;
         default: throw new RuntimeException("Unknown TCP Type: " + ab.getCtrl());
         }
-
       } catch( java.nio.channels.AsynchronousCloseException ex ) {
+        System.err.println("IO error on TCP port "+H2O.UDP_PORT+": "+ex);
+        ex.printStackTrace();
         break;                  // Socket closed for shutdown
       } catch( Exception e ) {
         // On any error from anybody, close all sockets & re-open
